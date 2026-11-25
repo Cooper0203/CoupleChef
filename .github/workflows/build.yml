@@ -1,0 +1,39 @@
+name: Build APK from ZIP
+on:
+  push:
+  workflow_dispatch:
+env:
+  GODOT_VERSION: "4.3"
+jobs:
+  android:
+    runs-on: ubuntu-22.04
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: |
+          ZIP=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
+          echo "Found: $ZIP"
+          mkdir -p unpacked
+          unzip -q -o "$ZIP" -d unpacked
+          PROJ=$(dirname $(find unpacked -name project.godot | head -n 1))
+          echo "PROJ=$PROJ" >> $GITHUB_ENV
+      - name: Setup Godot and Android
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates ~/.config/godot
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore /root/debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          JAVA_DIR=$(dirname $(dirname $(readlink -f $(which javac))))
+          cat > ~/.config/godot/editor_settings-4.3.tres <<EOF [gd_resource type="EditorSettings" format=3] [resource] export/android/java_sdk_path = "$JAVA_DIR" export/android/android_sdk_path = "${ANDROID_HOME:-/usr/lib/android-sdk}" export/android/debug_keystore = "/root/debug.keystore" export/android/debug_keystore_user = "androiddebugkey" export/android/debug_keystore_pass = "android" EOF
+          cp ~/.config/godot/editor_settings-4.3.tres ~/.config/godot/editor_settings-4.tres
+      - name: Export APK
+        working-directory: ${{ env.PROJ }}
+        run: |
+          mkdir -p build
+          godot --headless --import || true
+          godot --headless --verbose --export-debug "Android" build/CoupleChef.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CoupleChef-apk
+          path: ${{ env.PROJ }}/build/CoupleChef.apk
