@@ -36,6 +36,20 @@ jobs:
           echo 'export/android/debug_keystore_pass = "android"' >> $F
           cp $F ~/.config/godot/editor_settings-4.tres
           cat $F
+      - name: Install Android build tools
+        run: |
+          SDK_DIR=${ANDROID_HOME:-/usr/lib/android-sdk}
+          SDKM=$(find / -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -z "$SDKM" ]; then
+            curl -sSL -o /tmp/ct.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            mkdir -p $SDK_DIR/cmdline-tools
+            unzip -q /tmp/ct.zip -d $SDK_DIR/cmdline-tools
+            SDKM=$SDK_DIR/cmdline-tools/cmdline-tools/bin/sdkmanager
+          fi
+          echo "sdkmanager: $SDKM"
+          yes | $SDKM --sdk_root=$SDK_DIR --licenses > /dev/null || true
+          $SDKM --sdk_root=$SDK_DIR "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+          ls $SDK_DIR $SDK_DIR/build-tools
       - name: Export APK
         working-directory: ${{ env.PROJ }}
         run: |
