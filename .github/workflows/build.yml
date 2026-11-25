@@ -59,6 +59,27 @@ jobs:
           ls $SDK_DIR $SDK_DIR/build-tools $SDK_DIR/cmdline-tools
           ls $SDK_DIR/cmdline-tools/latest/bin
           ls $SDK_DIR/platform-tools | head
+      - name: Check export templates
+        run: |
+          echo "HOME=$HOME"
+          T=$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p $T
+          ls -la $HOME/.local/share/godot/export_templates/ || true
+          ls /root/.local/share/godot/export_templates/ || true
+          if [ ! -f $T/android_debug.apk ]; then
+            echo "android_debug.apk missing in $T, searching..."
+            FOUND=$(find / -name android_debug.apk -not -path "$T/*" 2>/dev/null | head -n 1)
+            if [ -n "$FOUND" ]; then
+              cp -r $(dirname $FOUND)/. $T/
+            else
+              echo "Downloading official export templates..."
+              curl -sSL -o /tmp/t.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+              unzip -q /tmp/t.tpz -d /tmp/tpl
+              cp -r /tmp/tpl/templates/. $T/
+            fi
+          fi
+          echo "${GODOT_VERSION}.stable" > $T/version.txt
+          ls -la $T | head -30
       - name: Export APK
         working-directory: ${{ env.PROJ }}
         run: |
